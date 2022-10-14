@@ -1,0 +1,49 @@
+name: Axe Tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest # or macos-latest, windows-latest
+    # Update env variables with your own database credentials
+    env:
+      PGHOST: localhost
+      PGDATABASE: next_js_ecommerce_store
+      PGUSERNAME: next_js_ecommerce_store
+      PGPASSWORD: next_js_ecommerce_store
+
+    steps:
+      - name: Start preinstalled PostgreSQL on Ubuntu
+        run: |
+          sudo systemctl start postgresql.service
+          pg_isready
+      - name: Create database user
+        run: |
+          sudo -u postgres psql --command="CREATE USER next_js_ecommerce_store PASSWORD 'next_js_ecommerce_store'" --command="\du"
+      - name: Create database and allow user
+        run: |
+          sudo -u postgres createdb --owner=next_js_ecommerce_store next_js_ecommerce_store
+      - uses: actions/checkout@v3
+      # Use the official setup-node action (sets up Node.js):
+      # https://github.com/actions/setup-node
+      - name: Use Node.js
+
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16.x'
+
+      - name: Install dependencies
+        run: yarn
+      - run: yarn migrate up
+      - name: Build localhost
+        run: yarn build
+      - name: Run localhost
+        run: yarn dev & npx wait-on http://localhost:3000
+      - name: Run axe
+        run: |
+          yarn global add @axe-core/cli
+          axe http://localhost:3000 --exit
